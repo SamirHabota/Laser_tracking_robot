@@ -15,6 +15,7 @@ using namespace System::IO::Ports;
 using namespace std;
 using namespace cv;
 
+
 //initial min and max HSV filter values.
 //these will be changed using trackbars
 int H_MIN = 0;
@@ -29,7 +30,7 @@ const int FRAME_WIDTH = 640;
 const int FRAME_HEIGHT = 480;
 
 //max number of objects to be detected in frame
-const int MAX_NUM_OBJECTS = 50;
+const int MAX_NUM_OBJECTS = 5;
 
 //minimum and maximum object area
 const int MIN_OBJECT_AREA = 10 * 10;
@@ -44,13 +45,9 @@ const string trackbarWindowName = "Trackbars";
 
 
 void on_trackbar(int, void*)
-{//This function gets called whenever a
+{
+	//This function gets called whenever a
 	// trackbar position is changed
-
-
-
-
-
 }
 
 string intToString(int number) {
@@ -148,68 +145,99 @@ void trackFilteredObject(int& x, int& y, Mat threshold, Mat& cameraFeed, SerialP
 	bool objectFound = false;
 	if (hierarchy.size() > 0) {
 		int numObjects = hierarchy.size();
+
+		if (numObjects > 1) {
+			putText(cameraFeed, "Please remove other projections", Point(0, 350), 2, 1, Scalar(0, 0, 255), 1);
+			return;
+		}
+
+
+
 		//if number of objects greater than MAX_NUM_OBJECTS we have a noisy filter
 		if (numObjects < MAX_NUM_OBJECTS) {
-			for (int index = 0; index >= 0; index = hierarchy[index][0]) {
 
-				Moments moment = moments((cv::Mat)contours[index]);
-				double area = moment.m00;
+				for (int index = 0; index >= 0; index = hierarchy[index][0]) {
 
-				//if the area is less than 20 px by 20px then it is probably just noise
-				//if the area is the same as the 3/2 of the image size, probably just a bad filter
-				//we only want the object with the largest area so we safe a reference area each
-				//iteration and compare it to the area in the next iteration.
-				if (area > MIN_OBJECT_AREA&& area<MAX_OBJECT_AREA && area>refArea) {
-					x = moment.m10 / area;
-					y = moment.m01 / area;
-					objectFound = true;
-					refArea = area;
+					Moments moment = moments((cv::Mat)contours[index]);
+					double area = moment.m00;
 
+					//if the area is less than 20 px by 20px then it is probably just noise
+					//if the area is the same as the 3/2 of the image size, probably just a bad filter
+					//we only want the object with the largest area so we safe a reference area each
+					//iteration and compare it to the area in the next iteration.
+					if (area > MIN_OBJECT_AREA&& area<MAX_OBJECT_AREA && area>refArea) {
+						x = moment.m10 / area;
+						y = moment.m01 / area;						
+						objectFound = true;
+						refArea = area;
+
+					}
+					else objectFound = false;
 				}
-				else objectFound = false;
-
-
-			}
+			
 			if (objectFound) {
 				drawObject(x, y, cameraFeed);
 
-				if (y < yCenter - 30) {
-					//move robot up
-					putText(cameraFeed, "Move up", Point(0, 50), 2, 1, Scalar(0, 0, 255), 2);
+				string modifiedX = intToString(x);
+				if (modifiedX.length() == 1) {
+					modifiedX = string(1, '0').append(modifiedX);
+					modifiedX = string(1, '0').append(modifiedX);
 				}
-				else if (y > yCenter + 30) {
-					//move robot down
-					putText(cameraFeed, "Move down", Point(0, 50), 2, 1, Scalar(0, 0, 255), 2);
-				}
-				else {
-					putText(cameraFeed, "Y centered", Point(0, 50), 2, 1, Scalar(0, 255, 0), 2);
-					yCentered = true;
+				else if (modifiedX.length() == 2) {
+					modifiedX = string(1, '0').append(modifiedX);					
 				}
 
-				if (x < xCenter - 30) {
-					//move robot left
-					putText(cameraFeed, "Move left", Point(0, 100), 2, 1, Scalar(0, 0, 255), 2);
+				string modifiedY = intToString(y);
+				if (modifiedY.length() == 1) {
+					modifiedY = string(1, '0').append(modifiedY);
+					modifiedY = string(1, '0').append(modifiedY);
 				}
-				else if (x > xCenter + 30) {
-					//move robot right
-					putText(cameraFeed, "Move right", Point(0, 100), 2, 1, Scalar(0, 0, 255), 2);
-				}
-				else {
-					putText(cameraFeed, "X centered", Point(0, 100), 2, 1, Scalar(0, 255, 0), 2);
-					xCentered = true;
+				else if (modifiedY.length() == 2) {
+					modifiedY = string(1, '0').append(modifiedY);
 				}
 
-				if (xCentered && yCentered) centered = true;
-				if (centered) {
-					//stop robot
-					putText(cameraFeed, "Centered", Point(0, 150), 2, 1, Scalar(255, 0, 0), 2);
-					port->Write("A");
+				string serialString = "location-" + modifiedX + "-" + modifiedY + "-move";
+
+				System::String^ serialCommand = gcnew System::String(serialString.c_str());
+				port->WriteLine(serialCommand);
+
+				if (y < 120) {
+					putText(cameraFeed, "High speed forward", Point(0, 350), 2, 1, Scalar(0, 255, 0), 1);
+					if (x < (FRAME_WIDTH / 2) - 30) {
+						putText(cameraFeed, "Turn left", Point(0, 400), 2, 1, Scalar(0, 255, 0), 1);
+					}
+					if (x > (FRAME_WIDTH / 2) + 30) {
+						putText(cameraFeed, "Turn right", Point(0, 400), 2, 1, Scalar(0, 255, 0), 1);
+					}
 				}
-				else port->Write("b");
+				else if (y > 120 && y < 220) {
+					putText(cameraFeed, "Medium speed forward", Point(0, 350), 2, 1, Scalar(0, 255, 0), 1);
+					if (x < (FRAME_WIDTH / 2) - 30) {
+						putText(cameraFeed, "Turn left", Point(0, 400), 2, 1, Scalar(0, 255, 0), 1);
+					}
+					if (x > (FRAME_WIDTH / 2) + 30) {
+						putText(cameraFeed, "Turn right", Point(0, 400), 2, 1, Scalar(0, 255, 0), 1);
+					}
+				}
+				else if (y > 220 && y < 320) {
+					putText(cameraFeed, "Low speed forward", Point(0, 350), 2, 1, Scalar(0, 255, 0), 1);
+					if (x < (FRAME_WIDTH / 2) - 30) {
+						putText(cameraFeed, "Turn left", Point(0, 400), 2, 1, Scalar(0, 255, 0), 1);
+					}
+					if (x > (FRAME_WIDTH / 2) + 30) {
+						putText(cameraFeed, "Turn right", Point(0, 400), 2, 1, Scalar(0, 255, 0), 1);
+					}
+				}
+				else {
+					putText(cameraFeed, "Robot in position", Point(0, 350), 2, 1, Scalar(243, 226, 68), 1);
+				}	
 			}
-
 		}
-		else putText(cameraFeed, "Too much noise", Point(0, 50), 1, 2, Scalar(0, 0, 255), 2);
+		else putText(cameraFeed, "Too much noise", Point(0, 350), 2, 1, Scalar(0, 0, 255), 1);
+	}
+	else {
+		port->WriteLine("location-000-000-stop");
+		putText(cameraFeed, "No laser detected", Point(0, 350), 2, 1, Scalar(0, 0, 255), 1);
 	}
 }
 
@@ -254,16 +282,22 @@ int main(int argc, char* argv[])
 		//store image to matrix
 		capture.read(cameraFeed);
 
+		//draw grid
+		line(cameraFeed, Point(FRAME_WIDTH/2, 0), Point(FRAME_WIDTH/2, FRAME_HEIGHT - (FRAME_HEIGHT/3)), Scalar(243, 226, 68), 1);
+		line(cameraFeed, Point(0, FRAME_HEIGHT - (FRAME_HEIGHT / 3)), Point(FRAME_WIDTH, FRAME_HEIGHT - (FRAME_HEIGHT / 3)), Scalar(243, 226, 68), 1);
+		line(cameraFeed, Point(FRAME_WIDTH / 2 -30, 0), Point(FRAME_WIDTH / 2-30, FRAME_HEIGHT - (FRAME_HEIGHT / 3)), Scalar(255, 255, 255), 1);
+		line(cameraFeed, Point(FRAME_WIDTH / 2 + 30, 0), Point(FRAME_WIDTH / 2 + 30, FRAME_HEIGHT - (FRAME_HEIGHT / 3)), Scalar(255, 255, 255), 1);
+		
 
 		//convert frame from BGR to HSV colorspace
 		cvtColor(cameraFeed, HSV, COLOR_BGR2HSV);
 		medianBlur(HSV, HSV, 3);
 
 		//filter HSV image between values and store filtered image to threshold matrix		
-		inRange(HSV, Scalar(H_MIN, S_MIN, V_MIN), Scalar(H_MAX, S_MAX, V_MAX), threshold);
+		//inRange(HSV, Scalar(H_MIN, S_MIN, V_MIN), Scalar(H_MAX, S_MAX, V_MAX), threshold);
 
 		//for red circulaer laser pointer (lower S_MAX)
-		//inRange(HSV, Scalar(H_MIN, S_MIN, V_MIN), Scalar(H_MAX, 10, V_MAX), threshold);
+		inRange(HSV, Scalar(H_MIN, S_MIN, V_MIN), Scalar(H_MAX, 10, V_MAX), threshold);
 
 		//perform morphological operations on thresholded image to eliminate noise
 		//and emphasize the filtered object(s)
