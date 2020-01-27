@@ -2,12 +2,10 @@
 #include <sstream>
 #include <string>
 #include <iostream>
-#include <opencv\highgui.h>
 #include <opencv\cv.h>
 #include <opencv2\imgproc.hpp>
 #include <opencv2\highgui.hpp>
-#include<opencv2/photo.hpp>
-#include<iostream>
+
 
 
 using namespace System;
@@ -37,10 +35,9 @@ const int MIN_OBJECT_AREA = 10 * 10;
 const int MAX_OBJECT_AREA = FRAME_HEIGHT * FRAME_WIDTH / 1.5;
 
 //names that will appear at the top of each window
-const string windowName = "Original Image";
-const string windowName1 = "HSV Image";
-const string windowName2 = "Thresholded Image";
-const string windowName3 = "After Morphological Operations";
+const string windowName = "Original image";
+const string HSVWindowName = "HSV image";
+const string binaryWindowName = "Binary image";
 const string trackbarWindowName = "Trackbars";
 
 
@@ -75,8 +72,6 @@ void createTrackbars() {
 	createTrackbar("S_MAX", trackbarWindowName, &S_MAX, S_MAX, on_trackbar);
 	createTrackbar("V_MIN", trackbarWindowName, &V_MIN, V_MAX, on_trackbar);
 	createTrackbar("V_MAX", trackbarWindowName, &V_MAX, V_MAX, on_trackbar);
-
-
 }
 
 void drawObject(int x, int y, Mat& frame) {
@@ -151,8 +146,6 @@ void trackFilteredObject(int& x, int& y, Mat threshold, Mat& cameraFeed, SerialP
 			return;
 		}
 
-
-
 		//if number of objects greater than MAX_NUM_OBJECTS we have a noisy filter
 		if (numObjects < MAX_NUM_OBJECTS) {
 
@@ -161,7 +154,7 @@ void trackFilteredObject(int& x, int& y, Mat threshold, Mat& cameraFeed, SerialP
 					Moments moment = moments((cv::Mat)contours[index]);
 					double area = moment.m00;
 
-					//if the area is less than 20 px by 20px then it is probably just noise
+					//if the area is less than 10 px by 10 px then it is probably just noise
 					//if the area is the same as the 3/2 of the image size, probably just a bad filter
 					//we only want the object with the largest area so we safe a reference area each
 					//iteration and compare it to the area in the next iteration.
@@ -180,8 +173,7 @@ void trackFilteredObject(int& x, int& y, Mat threshold, Mat& cameraFeed, SerialP
 
 				string modifiedX = intToString(x);
 				if (modifiedX.length() == 1) {
-					modifiedX = string(1, '0').append(modifiedX);
-					modifiedX = string(1, '0').append(modifiedX);
+					modifiedX = string(2, '0').append(modifiedX);
 				}
 				else if (modifiedX.length() == 2) {
 					modifiedX = string(1, '0').append(modifiedX);					
@@ -189,8 +181,7 @@ void trackFilteredObject(int& x, int& y, Mat threshold, Mat& cameraFeed, SerialP
 
 				string modifiedY = intToString(y);
 				if (modifiedY.length() == 1) {
-					modifiedY = string(1, '0').append(modifiedY);
-					modifiedY = string(1, '0').append(modifiedY);
+					modifiedY = string(2, '0').append(modifiedY);
 				}
 				else if (modifiedY.length() == 2) {
 					modifiedY = string(1, '0').append(modifiedY);
@@ -200,6 +191,8 @@ void trackFilteredObject(int& x, int& y, Mat threshold, Mat& cameraFeed, SerialP
 
 				System::String^ serialCommand = gcnew System::String(serialString.c_str());
 				port->WriteLine(serialCommand);
+				delete serialCommand;
+				serialCommand = nullptr;
 
 				if (y < 120) {
 					putText(cameraFeed, "High speed forward", Point(0, 350), 2, 1, Scalar(0, 255, 0), 1);
@@ -273,6 +266,9 @@ int main(int argc, char* argv[])
 	//open capture object at location zero (default location for webcam)
 	capture.open(1);
 
+	// check if the connection succeeded, or terminate the program
+	if (!capture.isOpened()) return -1;
+
 	//set height and width of capture frame
 	capture.set(CV_CAP_PROP_FRAME_WIDTH, FRAME_WIDTH);
 	capture.set(CV_CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT);	
@@ -296,7 +292,7 @@ int main(int argc, char* argv[])
 		//filter HSV image between values and store filtered image to threshold matrix		
 		//inRange(HSV, Scalar(H_MIN, S_MIN, V_MIN), Scalar(H_MAX, S_MAX, V_MAX), threshold);
 
-		//for red circulaer laser pointer (lower S_MAX)
+		//for red circular laser pointer (lower S_MAX)
 		inRange(HSV, Scalar(H_MIN, S_MIN, V_MIN), Scalar(H_MAX, 10, V_MAX), threshold);
 
 		//perform morphological operations on thresholded image to eliminate noise
@@ -311,14 +307,17 @@ int main(int argc, char* argv[])
 
 
 		//show frames 
-		imshow(windowName2, threshold);
+		imshow(binaryWindowName, threshold);
 		imshow(windowName, cameraFeed);
-		imshow(windowName1, HSV);
+		imshow(HSVWindowName, HSV);
 
 
-		//delay 30ms so that screen can refresh.
+		//delay 10ms so that screen can refresh.
 		waitKey(10);
 	}
+
+	delete port;
+	port = nullptr;
 
 	return 0;
 }
