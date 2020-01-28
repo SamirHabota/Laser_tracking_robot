@@ -32,7 +32,7 @@ const int MAX_NUM_OBJECTS = 5;
 
 //minimum and maximum object area
 const int MIN_OBJECT_AREA = 10 * 10;
-const int MAX_OBJECT_AREA = FRAME_HEIGHT * FRAME_WIDTH / 1.5;
+const int MAX_OBJECT_AREA = FRAME_HEIGHT * FRAME_WIDTH / 100;
 
 //names that will appear at the top of each window
 const string windowName = "Original image";
@@ -117,7 +117,7 @@ void morphOps(Mat& thresh) {
 
 }
 
-void trackFilteredObject(int& x, int& y, Mat threshold, Mat& cameraFeed, SerialPort^ port) {
+void trackFilteredObject(int& x, int& y, Mat binary, Mat& cameraFeed, SerialPort^ port) {
 
 
 	int xCenter = FRAME_WIDTH / 2;
@@ -127,7 +127,7 @@ void trackFilteredObject(int& x, int& y, Mat threshold, Mat& cameraFeed, SerialP
 	bool centered = false;	
 
 	Mat temp;
-	threshold.copyTo(temp);
+	binary.copyTo(temp);
 	//these two vectors needed for output of findContours
 	vector<vector<Point>> contours;
 	vector<Vec4i> hierarchy;
@@ -252,7 +252,7 @@ int main(int argc, char* argv[])
 	Mat HSV;
 
 	//matrix storage for binary threshold image
-	Mat threshold;
+	Mat binary;
 
 	//x and y values for the location of the object
 	int x = 0, y = 0;
@@ -293,21 +293,21 @@ int main(int argc, char* argv[])
 		//inRange(HSV, Scalar(H_MIN, S_MIN, V_MIN), Scalar(H_MAX, S_MAX, V_MAX), threshold);
 
 		//for red circular laser pointer (lower S_MAX)
-		inRange(HSV, Scalar(H_MIN, S_MIN, V_MIN), Scalar(H_MAX, 10, V_MAX), threshold);
+		inRange(HSV, Scalar(H_MIN, S_MIN, V_MIN), Scalar(H_MAX, 10, V_MAX), binary);
 
 		//perform morphological operations on thresholded image to eliminate noise
 		//and emphasize the filtered object(s)
-		if (useMorphOps) morphOps(threshold);
+		if (useMorphOps) morphOps(binary);
 
 		//pass in thresholded frame to our object tracking function
 		//this function will return the x and y coordinates of the
 		//filtered object
-		if (trackObjects) trackFilteredObject(x, y, threshold, cameraFeed, port);
+		if (trackObjects) trackFilteredObject(x, y, binary, cameraFeed, port);
 
 
 
 		//show frames 
-		imshow(binaryWindowName, threshold);
+		imshow(binaryWindowName, binary);
 		imshow(windowName, cameraFeed);
 		imshow(HSVWindowName, HSV);
 
