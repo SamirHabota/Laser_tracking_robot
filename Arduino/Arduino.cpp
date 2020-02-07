@@ -97,23 +97,19 @@ void drawObject(int x, int y, Mat& frame) {
 
 }
 
-void morphOps(Mat& thresh) {
+void morphOps(Mat& binary) {
 
 	//create structuring element that will be used to "dilate" and "erode" image.
-	//the element chosen here is a 3px by 3px rectangle
 
 	Mat erodeElement = getStructuringElement(MORPH_ELLIPSE, Size(3, 3));
-	//dilate with larger element so make sure object is nicely visible
+	//dilate with larger element to make sure object is nicely visible
 	Mat dilateElement = getStructuringElement(MORPH_ELLIPSE, Size(8, 8));
 
-	erode(thresh, thresh, erodeElement);
-	erode(thresh, thresh, erodeElement);
+	erode(binary, binary, erodeElement);
+	erode(binary, binary, erodeElement);
 
-
-	dilate(thresh, thresh, dilateElement);
-	dilate(thresh, thresh, dilateElement);
-
-
+	dilate(binary, binary, dilateElement);
+	dilate(binary, binary, dilateElement);
 
 }
 
@@ -263,7 +259,7 @@ int main(int argc, char* argv[])
 	//video capture object to acquire webcam feed
 	VideoCapture capture;
 
-	//open capture object at location zero (default location for webcam)
+	//open capture object at location
 	capture.open(1);
 
 	// check if the connection succeeded, or terminate the program
@@ -279,24 +275,31 @@ int main(int argc, char* argv[])
 		capture.read(cameraFeed);
 
 		//draw grid
+
+		//main upside down T
 		line(cameraFeed, Point(FRAME_WIDTH/2, 0), Point(FRAME_WIDTH/2, FRAME_HEIGHT - (FRAME_HEIGHT/3)), Scalar(243, 226, 68), 1);
 		line(cameraFeed, Point(0, FRAME_HEIGHT - (FRAME_HEIGHT / 3)), Point(FRAME_WIDTH, FRAME_HEIGHT - (FRAME_HEIGHT / 3)), Scalar(243, 226, 68), 1);
+		//vertical guides
 		line(cameraFeed, Point(FRAME_WIDTH / 2 -30, 0), Point(FRAME_WIDTH / 2-30, FRAME_HEIGHT - (FRAME_HEIGHT / 3)), Scalar(255, 255, 255), 1);
 		line(cameraFeed, Point(FRAME_WIDTH / 2 + 30, 0), Point(FRAME_WIDTH / 2 + 30, FRAME_HEIGHT - (FRAME_HEIGHT / 3)), Scalar(255, 255, 255), 1);
-		
+		//horizontal guides
+		line(cameraFeed, Point(0, 120), Point(FRAME_WIDTH, 120), Scalar(255, 255, 255), 1);
+		line(cameraFeed, Point(0, 220), Point(FRAME_WIDTH, 220), Scalar(255, 255, 255), 1);
 
 		//convert frame from BGR to HSV colorspace
 		cvtColor(cameraFeed, HSV, COLOR_BGR2HSV);
+
+		//add median blur to HSV image
 		medianBlur(HSV, HSV, 3);
 
-		//filter HSV image between values and store filtered image to threshold matrix		
-		//inRange(HSV, Scalar(H_MIN, S_MIN, V_MIN), Scalar(H_MAX, S_MAX, V_MAX), threshold);
+		//filter HSV image between values and store filtered image to binary matrix		
+		//inRange(HSV, Scalar(H_MIN, S_MIN, V_MIN), Scalar(H_MAX, S_MAX, V_MAX), binary);
 
 		//for red circular laser pointer (lower S_MAX)
 		inRange(HSV, Scalar(H_MIN, S_MIN, V_MIN), Scalar(H_MAX, 10, V_MAX), binary);
 
-		//perform morphological operations on thresholded image to eliminate noise
-		//and emphasize the filtered object(s)
+		//perform morphological operations on binary image to eliminate noise
+		//and emphasize the filtered object
 		if (useMorphOps) morphOps(binary);
 
 		//pass in thresholded frame to our object tracking function
