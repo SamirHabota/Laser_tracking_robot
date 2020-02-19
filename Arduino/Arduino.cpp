@@ -76,8 +76,7 @@ void createTrackbars() {
 
 void drawObject(int x, int y, Mat& frame) {
 
-	//use some of the openCV drawing functions to draw crosshairs
-	//on your tracked image!
+	//drawing crosshairs on the image
 
 	circle(frame, Point(x, y), 20, Scalar(0, 255, 0), 2);
 	if (y - 25 > 0)
@@ -94,7 +93,6 @@ void drawObject(int x, int y, Mat& frame) {
 	else line(frame, Point(x, y), Point(FRAME_WIDTH, y), Scalar(0, 255, 0), 2);
 
 	putText(frame, intToString(x) + "," + intToString(y), Point(x, y + 30), 1, 1, Scalar(0, 255, 0), 2);
-
 }
 
 void morphOps(Mat& binary) {
@@ -115,16 +113,18 @@ void morphOps(Mat& binary) {
 
 void trackFilteredObject(int& x, int& y, Mat binary, Mat& cameraFeed, SerialPort^ port) {
 
+	//DELETE LATER
+	//int xCenter = FRAME_WIDTH / 2;
+	//int yCenter = FRAME_HEIGHT / 2;
+	//bool yCentered = false;
+	//bool xCentered = false;
+	//bool centered = false;	
 
-	int xCenter = FRAME_WIDTH / 2;
-	int yCenter = FRAME_HEIGHT / 2;
-	bool yCentered = false;
-	bool xCentered = false;
-	bool centered = false;	
-
+	//copying the binary image to a temporary Mat object for modification
 	Mat temp;
 	binary.copyTo(temp);
-	//these two vectors needed for output of findContours
+
+	//two vectors needed for output of findContours
 	vector<vector<Point>> contours;
 	vector<Vec4i> hierarchy;
 
@@ -149,17 +149,12 @@ void trackFilteredObject(int& x, int& y, Mat binary, Mat& cameraFeed, SerialPort
 
 					Moments moment = moments((cv::Mat)contours[index]);
 					double area = moment.m00;
-
-					//if the area is less than 10 px by 10 px then it is probably just noise
-					//if the area is the same as the 3/2 of the image size, probably just a bad filter
-					//we only want the object with the largest area so we safe a reference area each
-					//iteration and compare it to the area in the next iteration.
+					
 					if (area > MIN_OBJECT_AREA&& area<MAX_OBJECT_AREA && area>refArea) {
 						x = moment.m10 / area;
-						y = moment.m01 / area;						
+						y = moment.m01 / area;					
 						objectFound = true;
 						refArea = area;
-
 					}
 					else objectFound = false;
 				}
@@ -187,8 +182,6 @@ void trackFilteredObject(int& x, int& y, Mat binary, Mat& cameraFeed, SerialPort
 
 				System::String^ serialCommand = gcnew System::String(serialString.c_str());
 				port->WriteLine(serialCommand);
-				delete serialCommand;
-				serialCommand = nullptr;
 
 				if (y < 120) {
 					putText(cameraFeed, "High speed forward", Point(0, 350), 2, 1, Scalar(0, 255, 0), 1);
@@ -233,7 +226,7 @@ void trackFilteredObject(int& x, int& y, Mat binary, Mat& cameraFeed, SerialPort
 int main(int argc, char* argv[])
 {
 	
-	//open arduino connection 
+	//open serial arduino connection 
 	SerialPort^ port = gcnew SerialPort("COM10", 9600);
 	port->Open();
 	cout << "Serial open" << endl;
@@ -275,14 +268,12 @@ int main(int argc, char* argv[])
 		capture.read(cameraFeed);
 
 		//draw grid
-
-		//main upside down T
-		line(cameraFeed, Point(FRAME_WIDTH/2, 0), Point(FRAME_WIDTH/2, FRAME_HEIGHT - (FRAME_HEIGHT/3)), Scalar(243, 226, 68), 1);
-		line(cameraFeed, Point(0, FRAME_HEIGHT - (FRAME_HEIGHT / 3)), Point(FRAME_WIDTH, FRAME_HEIGHT - (FRAME_HEIGHT / 3)), Scalar(243, 226, 68), 1);
 		//vertical guides
+		line(cameraFeed, Point(FRAME_WIDTH / 2, 0), Point(FRAME_WIDTH / 2, FRAME_HEIGHT - (FRAME_HEIGHT / 3)), Scalar(243, 226, 68), 1);
 		line(cameraFeed, Point(FRAME_WIDTH / 2 -30, 0), Point(FRAME_WIDTH / 2-30, FRAME_HEIGHT - (FRAME_HEIGHT / 3)), Scalar(255, 255, 255), 1);
 		line(cameraFeed, Point(FRAME_WIDTH / 2 + 30, 0), Point(FRAME_WIDTH / 2 + 30, FRAME_HEIGHT - (FRAME_HEIGHT / 3)), Scalar(255, 255, 255), 1);
 		//horizontal guides
+		line(cameraFeed, Point(0, FRAME_HEIGHT - (FRAME_HEIGHT / 3)), Point(FRAME_WIDTH, FRAME_HEIGHT - (FRAME_HEIGHT / 3)), Scalar(243, 226, 68), 1);
 		line(cameraFeed, Point(0, 120), Point(FRAME_WIDTH, 120), Scalar(255, 255, 255), 1);
 		line(cameraFeed, Point(0, 220), Point(FRAME_WIDTH, 220), Scalar(255, 255, 255), 1);
 
@@ -302,25 +293,19 @@ int main(int argc, char* argv[])
 		//and emphasize the filtered object
 		if (useMorphOps) morphOps(binary);
 
-		//pass in thresholded frame to our object tracking function
+		//pass in modified binary frame to the object tracking function
 		//this function will return the x and y coordinates of the
-		//filtered object
+		//filtered laser projection
 		if (trackObjects) trackFilteredObject(x, y, binary, cameraFeed, port);
-
-
 
 		//show frames 
 		imshow(binaryWindowName, binary);
 		imshow(windowName, cameraFeed);
 		imshow(HSVWindowName, HSV);
 
-
 		//delay 10ms so that screen can refresh.
 		waitKey(10);
 	}
-
-	delete port;
-	port = nullptr;
 
 	return 0;
 }
